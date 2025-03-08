@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Blazored.Messaging.Lib\Blazored.Messaging.csproj" />
+    <ProjectReference Include="..\Blazored.Messaging.Lib\Blazor.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

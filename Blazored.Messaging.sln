@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.12.35728.132
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazored.Messaging", "Blazored.Messaging.Lib\Blazored.Messaging.csproj", "{46630304-EA0D-478A-9754-7CED46FCFAB8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazor.Messaging", "Blazored.Messaging.Lib\Blazor.Messaging.csproj", "{46630304-EA0D-478A-9754-7CED46FCFAB8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazored.Messaging.Demo", "Blazored.Messaging.Demo\Blazored.Messaging.Demo.csproj", "{D4315E7A-181B-4D04-B29D-552AE5934CF0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazor.Messaging.Demo", "Blazored.Messaging.Demo\Blazor.Messaging.Demo.csproj", "{D4315E7A-181B-4D04-B29D-552AE5934CF0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

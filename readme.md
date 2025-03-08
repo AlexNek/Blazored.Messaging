@@ -1,19 +1,19 @@
 # Blazored.Messaging
 
 ### Overview
-`Blazored.Messaging` is a simple, in-memory messaging tool made for Blazor apps. It uses a publish-subscribe (pub/sub) pattern. This means you can send and receive messages with clear types between parts of your app. You don’t need to connect components directly, which makes your code easier to manage.
+`Blazor.Messaging` is a simple, in-memory messaging tool made for Blazor apps. It uses a publish-subscribe (pub/sub) pattern. This means you can send and receive messages with clear types between parts of your app. You don’t need to connect components directly, which makes your code easier to manage.
 
 I apologize for the confusion. You're right that this characteristic is common across libraries. Here's a concise "Motivation & Differentiation" section that addresses your points:
 
 ### Motivation & Differentiation
 
-`Blazored.Messaging` was created to fill a gap in Blazor messaging solutions. While libraries like MediatR, Prism's EventAggregator, and custom event buses exist, they often introduce complexity or require extra setup unsuitable for Blazor's architecture. The goal was to develop a tool that:
+`Blazor.Messaging` was created to fill a gap in Blazor messaging solutions. While libraries like MediatR, Prism's EventAggregator, and custom event buses exist, they often introduce complexity or require extra setup unsuitable for Blazor's architecture. The goal was to develop a tool that:
 
 1. Simplifies handling multiple message types within a single component.
 2. Integrates seamlessly with Blazor's component lifecycle.
 3. Minimizes boilerplate code and setup.
 
-Unlike other solutions, `Blazored.Messaging`  is designed to be versatile and can be used across different frameworks, but it is particularly well-suited for Blazor applications, offering a straightforward pub/sub pattern that allows components to easily send and react to multiple message types without unnecessary complexity.
+Unlike other solutions, `Blazor.Messaging`  is designed to be versatile and can be used across different frameworks, but it is particularly well-suited for Blazor applications, offering a straightforward pub/sub pattern that allows components to easily send and react to multiple message types without unnecessary complexity.
 
 ## Features
 - **Synchronous and Asynchronous Messaging**: Supports both `Action<TMessage>` and `Func<TMessage, Task>` handlers.
@@ -26,7 +26,7 @@ Unlike other solutions, `Blazored.Messaging`  is designed to be versatile and ca
 Install via NuGet (once published) or reference locally:
 
 ```bash
-dotnet add package Blazored.Messaging
+dotnet add package Blazor.Messaging
 ```
 
 ## Setup in Blazor

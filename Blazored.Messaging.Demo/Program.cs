@@ -1,6 +1,6 @@
-using Blazored.Messaging.Demo.Components;
+using Blazor.Messaging.Demo.Components;
 
-namespace Blazored.Messaging.Demo
+namespace Blazor.Messaging.Demo
 {
     public class Program
     {

@@ -1,4 +1,4 @@
-﻿namespace Blazored.Messaging;
+﻿namespace Blazor.Messaging;
 
 public class HandlerExceptionEventArgs : EventArgs
 {

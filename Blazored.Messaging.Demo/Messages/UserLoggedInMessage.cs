@@ -1,4 +1,4 @@
-﻿namespace Blazored.Messaging.Demo.Messages
+﻿namespace Blazor.Messaging.Demo.Messages
 {
     public class UserLoggedInMessage
     {
