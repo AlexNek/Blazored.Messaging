@@ -1,0 +1,28 @@
+﻿@using Blazored.Messaging.Demo.Messages
+@inject IMessagingService MessagingService
+@implements IDisposable
+
+<h3>Async Notification Component</h3>
+
+<p>@asyncNotification</p>
+
+@code {
+    private string asyncNotification = "Waiting for async response...";
+
+    private async Task AsyncHandler(UserLoggedInMessage message)
+    {
+        await Task.Delay(1000);
+        asyncNotification = $"{message.Username} logged in (async) after 1s!";
+        StateHasChanged();
+    }
+
+    protected override void OnInitialized()
+    {
+        MessagingService.Subscribe<UserLoggedInMessage>(AsyncHandler);
+    }
+
+    public void Dispose()
+    {
+        MessagingService.Unsubscribe<UserLoggedInMessage>(AsyncHandler);
+    }
+}

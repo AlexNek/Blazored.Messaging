@@ -1,0 +1,18 @@
+﻿@using Blazored.Messaging.Demo.Messages
+@inject IMessagingService MessagingService
+
+<h3>Login Component</h3>
+
+<input @bind="username" placeholder="Enter username" />
+<button @onclick="PublishLogin">Log In</button>
+
+@code {
+    private string username = string.Empty;
+
+    private async Task PublishLogin()
+    {
+        var message = new UserLoggedInMessage { Username = username };
+        await MessagingService.Publish(message);
+        username = string.Empty;
+    }
+}

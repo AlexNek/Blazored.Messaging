@@ -1,0 +1,27 @@
+﻿@using Blazored.Messaging.Demo.Messages
+@inject IMessagingService MessagingService
+@implements IDisposable
+
+<h3>Notification Component</h3>
+
+<p>@notification</p>
+
+@code {
+    private string notification = "Waiting for login...";
+
+    private void SyncHandler(UserLoggedInMessage message)
+    {
+        notification = $"{message.Username} has logged in!";
+        StateHasChanged();
+    }
+
+    protected override void OnInitialized()
+    {
+        MessagingService.Subscribe<UserLoggedInMessage>(SyncHandler);
+    }
+
+    public void Dispose()
+    {
+        MessagingService.Unsubscribe<UserLoggedInMessage>(SyncHandler);
+    }
+}
