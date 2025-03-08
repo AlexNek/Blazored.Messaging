@@ -2,14 +2,16 @@
 
 public class HandlerExceptionEventArgs : EventArgs
 {
-  public Exception Exception { get; }
-  public Type MessageType { get; }
-  public object Handler { get; } // Action or Func
+    public Exception Exception { get; }
 
-  public HandlerExceptionEventArgs(Exception exception, Type messageType, object handler)
-  {
-    Exception = exception;
-    MessageType = messageType;
-    Handler = handler;
-  }
+    public object Handler { get; } // Action or Func
+
+    public Type MessageType { get; }
+
+    public HandlerExceptionEventArgs(Exception exception, Type messageType, object handler)
+    {
+        Exception = exception;
+        MessageType = messageType;
+        Handler = handler;
+    }
 }

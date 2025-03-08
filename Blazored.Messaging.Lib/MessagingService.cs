@@ -2,96 +2,104 @@
 
 public class MessagingService : IMessagingService
 {
-  public event EventHandler<HandlerExceptionEventArgs> HandlerExceptionOccurred;
-  private readonly Dictionary<Type, List<object>> _asyncSubscribers = new();
-  private readonly Dictionary<Type, List<object>> _syncSubscribers = new();
+    public event EventHandler<HandlerExceptionEventArgs> HandlerExceptionOccurred;
 
-  public async Task Publish<TMessage>(TMessage message) where TMessage : class
-  {
-    var messageType = typeof(TMessage);
+    private readonly Dictionary<Type, List<object>> _asyncSubscribers = new();
 
-    // Run sync handlers
-    if (_syncSubscribers.ContainsKey(messageType))
+    private readonly Dictionary<Type, List<object>> _syncSubscribers = new();
+
+    public async Task Publish<TMessage>(TMessage message)
+        where TMessage : class
     {
-      var syncHandlers = _syncSubscribers[messageType].Cast<Action<TMessage>>().ToList();
-      foreach (var handler in syncHandlers)
-      {
-        try
+        var messageType = typeof(TMessage);
+
+        // Run sync handlers
+        if (_syncSubscribers.ContainsKey(messageType))
         {
-          handler(message);
+            var syncHandlers = _syncSubscribers[messageType].Cast<Action<TMessage>>().ToList();
+            foreach (var handler in syncHandlers)
+            {
+                try
+                {
+                    handler(message);
+                }
+                catch (Exception ex)
+                {
+                    OnHandlerException(new HandlerExceptionEventArgs(ex, messageType, handler));
+                }
+            }
         }
-        catch (Exception ex)
+
+        // Run async handlers
+        if (_asyncSubscribers.ContainsKey(messageType))
         {
-          OnHandlerException(new HandlerExceptionEventArgs(ex, messageType, handler));
+            var asyncHandlers =
+                _asyncSubscribers[messageType].Cast<Func<TMessage, Task>>().ToList();
+            foreach (var handler in asyncHandlers)
+            {
+                try
+                {
+                    await handler(message);
+                }
+                catch (Exception ex)
+                {
+                    OnHandlerException(new HandlerExceptionEventArgs(ex, messageType, handler));
+                }
+            }
         }
-      }
     }
 
-    // Run async handlers
-    if (_asyncSubscribers.ContainsKey(messageType))
+    public void Subscribe<TMessage>(Action<TMessage> handler)
+        where TMessage : class
     {
-      var asyncHandlers = _asyncSubscribers[messageType].Cast<Func<TMessage, Task>>().ToList();
-      foreach (var handler in asyncHandlers)
-      {
-        try
+        var messageType = typeof(TMessage);
+        if (!_syncSubscribers.ContainsKey(messageType))
         {
-          await handler(message);
+            _syncSubscribers[messageType] = new List<object>();
         }
-        catch (Exception ex)
+
+        _syncSubscribers[messageType].Add(handler);
+    }
+
+    public void Subscribe<TMessage>(Func<TMessage, Task> handler)
+        where TMessage : class
+    {
+        var messageType = typeof(TMessage);
+        if (!_asyncSubscribers.ContainsKey(messageType))
         {
-          OnHandlerException(new HandlerExceptionEventArgs(ex, messageType, handler));
+            _asyncSubscribers[messageType] = new List<object>();
         }
-      }
-    }
-  }
 
-  public void Subscribe<TMessage>(Action<TMessage> handler) where TMessage : class
-  {
-    var messageType = typeof(TMessage);
-    if (!_syncSubscribers.ContainsKey(messageType))
+        _asyncSubscribers[messageType].Add(handler);
+    }
+
+    public void Unsubscribe<TMessage>(Action<TMessage> handler)
+        where TMessage : class
     {
-      _syncSubscribers[messageType] = new List<object>();
+        var messageType = typeof(TMessage);
+        if (_syncSubscribers.ContainsKey(messageType))
+        {
+            _syncSubscribers[messageType].Remove(handler);
+        }
     }
 
-    _syncSubscribers[messageType].Add(handler);
-  }
-
-  public void Subscribe<TMessage>(Func<TMessage, Task> handler) where TMessage : class
-  {
-    var messageType = typeof(TMessage);
-    if (!_asyncSubscribers.ContainsKey(messageType))
+    public void Unsubscribe<TMessage>(Func<TMessage, Task> handler)
+        where TMessage : class
     {
-      _asyncSubscribers[messageType] = new List<object>();
+        var messageType = typeof(TMessage);
+        if (_asyncSubscribers.ContainsKey(messageType))
+        {
+            _asyncSubscribers[messageType].Remove(handler);
+        }
     }
 
-    _asyncSubscribers[messageType].Add(handler);
-  }
-
-  public void Unsubscribe<TMessage>(Action<TMessage> handler) where TMessage : class
-  {
-    var messageType = typeof(TMessage);
-    if (_syncSubscribers.ContainsKey(messageType))
+    protected virtual void OnHandlerException(HandlerExceptionEventArgs e)
     {
-      _syncSubscribers[messageType].Remove(handler);
+        // Raise the event; fallback to console if no subscribers
+        HandlerExceptionOccurred?.Invoke(this, e);
+        if (HandlerExceptionOccurred == null)
+        {
+            Console.WriteLine($"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
+        }
     }
-  }
-
-  public void Unsubscribe<TMessage>(Func<TMessage, Task> handler) where TMessage : class
-  {
-    var messageType = typeof(TMessage);
-    if (_asyncSubscribers.ContainsKey(messageType))
-    {
-      _asyncSubscribers[messageType].Remove(handler);
-    }
-  }
-
-  protected virtual void OnHandlerException(HandlerExceptionEventArgs e)
-  {
-    // Raise the event; fallback to console if no subscribers
-    HandlerExceptionOccurred?.Invoke(this, e);
-    if (HandlerExceptionOccurred == null)
-    {
-      Console.WriteLine($"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
-    }
-  }
 }
