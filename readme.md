@@ -176,13 +176,3 @@ Contributions welcome! Submit issues or PRs to improve the library.
 
 ## License
 Licensed under the **Apache License 2.0** - see [LICENSE](LICENSE) for details.
-
----
-
-### Improvements Made
-1. **Motivation Explained**: Clearly states why you built it—addressing the gap in easy, Blazor-focused messaging libraries.
-2. **Library Comparisons**: Contrasts with MediatR, Prism EventAggregator, and custom solutions to justify its existence.
-3. **Tone**: Keeps it personal and relatable ("I couldn’t find what I needed, so I built this").
-4. **Structure**: Maintains clarity while adding context.
-
-Let me know if you’d like to tweak the comparisons or add more details!
