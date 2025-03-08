@@ -1,4 +1,4 @@
-# Blazored.Messaging
+# Blazor.Messaging
 
 ### Overview
 `Blazor.Messaging` is a simple, in-memory messaging tool made for Blazor apps. It uses a publish-subscribe (pub/sub) pattern. This means you can send and receive messages with clear types between parts of your app. You don’t need to connect components directly, which makes your code easier to manage.
