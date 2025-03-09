@@ -1,0 +1,31 @@
+﻿@page "/countertest_async"
+@using Blazor.Messaging
+@inject IMessagingService MessagingService
+
+<h1>Minimal Test Component</h1>
+
+<p>Count: @_count</p>
+
+<button @onclick="PublishMessage">Publish Message</button>
+
+@code {
+    private int _count = 0;
+
+    protected override void OnInitialized()
+    {
+        MessagingService.Subscribe<TestMessage>(HandleTestMessage);
+    }
+
+    private async Task HandleTestMessage(TestMessage message) // ASYNC HANDLER - IMPORTANT
+    {
+        _count++;
+        StateHasChanged(); // Direct UI update
+    }
+
+    private async Task PublishMessage()
+    {
+        await MessagingService.Publish(new TestMessage());
+    }
+
+    public class TestMessage { }
+}
