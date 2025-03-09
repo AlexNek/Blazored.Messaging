@@ -196,3 +196,4 @@ Licensed under the **Apache License 2.0** - see [LICENSE](LICENSE) for details.
 ## Version History
 - **v1.0.0**: Initial release.
 - **v1.1.0**: Added prevention of duplicate subscriptions and long running task timiout.
+- **v1.2.0**: Missed file - SubscriberException.
