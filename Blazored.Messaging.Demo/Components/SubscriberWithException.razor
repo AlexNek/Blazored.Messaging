@@ -1,28 +1,40 @@
 ﻿@inject IMessagingService MessagingService
+@using System.Diagnostics
 @using Blazor.Messaging.Demo.Messages
 @implements IDisposable
 
 <h3>Notification Component with exception</h3>
 
-<p>@notification</p>
+<p>@_notification</p>
 
 @code {
-    private string notification = "Waiting for login...";
+    private string _notification = "Waiting for login...";
 
     private void SyncHandler(UserLoggedInMessage message)
     {
-        notification = $"{message.Username} has logged in!";
-        throw new Exception("An error occurred in the handler");
+        _notification = $"{message.Username} has logged in!";
         StateHasChanged();
+        throw new Exception("An error occurred in the handler");
     }
 
-    protected override void OnInitialized()
+    // protected override void OnInitialized()
+    // {
+    //     MessagingService.Subscribe<UserLoggedInMessage>(SyncHandler);
+    // }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        MessagingService.Subscribe<UserLoggedInMessage>(SyncHandler);
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender)
+        {
+            //don't use OnInitialzedXxx as it will be called by prerendering too
+            MessagingService.Subscribe<UserLoggedInMessage>(SyncHandler);
+            Debug.WriteLine("Subscribed to UserLoggedInMessage in OnAfterRenderAsync");
+        }
     }
 
     public void Dispose()
     {
         MessagingService.Unsubscribe<UserLoggedInMessage>(SyncHandler);
+        Debug.WriteLine("UnSubscribe from UserLoggedInMessage in Dispose");
     }
 }

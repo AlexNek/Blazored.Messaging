@@ -1,4 +1,5 @@
-﻿@using Blazor.Messaging
+﻿@using System.Diagnostics
+@using Blazor.Messaging
 @using Blazor.Messaging.Demo.Messages
 @inject IMessagingService MessagingService
 @implements IDisposable
@@ -26,16 +27,22 @@
     private bool _isPublishing = false;
     private List<string> _errorMessages = new();
    
-
-    protected override void OnInitialized()
+   
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        MessagingService.HandlerExceptionOccurred += OnHandlerExceptionOccurred;
+        await base.OnAfterRenderAsync(firstRender);
+        if (firstRender)
+        {
+            //don't use OnInitialzedXxx as it will be called by prerendering too
+            MessagingService.HandlerExceptionOccurred += OnHandlerExceptionOccurred;
+            Debug.WriteLine("Subscribed to HandlerExceptionOccurred in OnAfterRenderAsync");
+        }
     }
 
     private void OnHandlerExceptionOccurred(object? sender, HandlerExceptionEventArgs e)
     {
-        // Aggregate exceptions with subscriber context
         _errorMessages.Add($"{e.SubscriberInfo} - {e.Exception.Message}");
+        Debug.WriteLine($"Exception logged: {e.SubscriberInfo} - {e.Exception.Message}");
         StateHasChanged();
     }
 
@@ -68,5 +75,6 @@
     public void Dispose()
     {
         MessagingService.HandlerExceptionOccurred -= OnHandlerExceptionOccurred;
+        Debug.WriteLine("Unsubscribed from HandlerExceptionOccurred in Dispose");
     }
 }

@@ -5,10 +5,54 @@ namespace Blazor.Messaging;
 
 public class MessagingService : IMessagingService, IDisposable
 {
-    public event EventHandler<HandlerExceptionEventArgs>? HandlerExceptionOccurred;
+    public event EventHandler<HandlerExceptionEventArgs>? HandlerExceptionOccurred
+    {
+        add
+        {
+            if (value != null)
+            {
+                lock (_exceptionHandlerIds)
+                {
+                    int handlerId = value.GetHashCode();
+                    if (_exceptionHandlerIds.Add(handlerId))
+                    {
+                        _handlerExceptionOccurred += value;
+                        Debug.WriteLine(
+                            $"Added handler ID {handlerId}. Total handlers: {_exceptionHandlerIds.Count}");
+                    }
+                    else
+                    {
+                        Debug.WriteLine(
+                            $"Handler ID {handlerId} already exists. Skipping duplicate.");
+                    }
+                }
+            }
+        }
+        remove
+        {
+            if (value != null)
+            {
+                lock (_exceptionHandlerIds)
+                {
+                    int handlerId = value.GetHashCode();
+                    if (_exceptionHandlerIds.Remove(handlerId))
+                    {
+                        _handlerExceptionOccurred -= value;
+                        Debug.WriteLine(
+                            $"Removed handler ID {handlerId}. Total handlers: {_exceptionHandlerIds.Count}");
+                    }
+                }
+            }
+        }
+    }
 
     private readonly Dictionary<Type, List<(string SubscriberInfo, Func<object, Task> Handler)>>
         _asyncSubscribers = new();
+
+    /// <summary>
+    /// Use HashSet to track unique subscribers by their hash code
+    /// </summary>
+    private readonly HashSet<int> _exceptionHandlerIds = new();
 
     private readonly TimeSpan _handlerTimeout;
 
@@ -21,6 +65,8 @@ public class MessagingService : IMessagingService, IDisposable
 
     private readonly Dictionary<Type, List<(string SubscriberInfo, Action<object> Handler)>>
         _syncSubscribers = new();
+
+    private EventHandler<HandlerExceptionEventArgs>? _handlerExceptionOccurred;
 
     private bool _isRunning = true;
 
@@ -57,11 +103,22 @@ public class MessagingService : IMessagingService, IDisposable
             throw new ArgumentNullException(nameof(message));
         }
 
+        // Create a TaskCompletionSource to represent the completion of the message handling.
+        // This task will be completed by the consumer that processes the message.
         var tcs = new TaskCompletionSource<bool>();
+
+        // Enqueue the message into the message queue for processing.
+        // The tuple contains:
+        // - The type of the message (for identifying the message type),
+        // - The actual message object,
+        // - The TaskCompletionSource that will be completed when processing is done.
         _messageQueue.Enqueue((typeof(TMessage), message, tcs));
 
         if (throwOnTimeout)
         {
+            // Use Task.WhenAny to wait for either:
+            // - The tcs.Task to complete (indicating successful processing of the message),
+            // - Or a Task.Delay to complete (indicating a timeout has occurred).
             return Task.WhenAny(tcs.Task, Task.Delay(_handlerTimeout)).ContinueWith(
                 t =>
                     {
@@ -73,6 +130,8 @@ public class MessagingService : IMessagingService, IDisposable
                     });
         }
 
+        // If throwOnTimeout is false, simply return the TaskCompletionSource's task.
+        // The caller can await this task and handle it as needed.
         return tcs.Task;
     }
 
@@ -90,7 +149,18 @@ public class MessagingService : IMessagingService, IDisposable
                 _syncSubscribers[messageType] = new List<(string, Action<object>)>();
             }
 
-            _syncSubscribers[messageType].Add((subscriberInfo, wrappedHandler));
+            // Check for existing subscription by SubscriberInfo
+            if (!_syncSubscribers[messageType].Any(s => s.SubscriberInfo == subscriberInfo))
+            {
+                _syncSubscribers[messageType].Add((subscriberInfo, wrappedHandler));
+                Debug.WriteLine(
+                    $"Subscribed sync handler for {messageType.Name} from {subscriberInfo}. Total: {_syncSubscribers[messageType].Count}");
+            }
+            else
+            {
+                Debug.WriteLine(
+                    $"Duplicate sync subscription attempt for {messageType.Name} from {subscriberInfo}. Skipping.");
+            }
         }
     }
 
@@ -108,7 +178,18 @@ public class MessagingService : IMessagingService, IDisposable
                 _asyncSubscribers[messageType] = new List<(string, Func<object, Task>)>();
             }
 
-            _asyncSubscribers[messageType].Add((subscriberInfo, wrappedHandler));
+            // Check for existing subscription by SubscriberInfo
+            if (!_asyncSubscribers[messageType].Any(s => s.SubscriberInfo == subscriberInfo))
+            {
+                _asyncSubscribers[messageType].Add((subscriberInfo, wrappedHandler));
+                Debug.WriteLine(
+                    $"Subscribed async handler for {messageType.Name} from {subscriberInfo}. Total: {_asyncSubscribers[messageType].Count}");
+            }
+            else
+            {
+                Debug.WriteLine(
+                    $"Duplicate async subscription attempt for {messageType.Name} from {subscriberInfo}. Skipping.");
+            }
         }
     }
 
@@ -149,8 +230,8 @@ public class MessagingService : IMessagingService, IDisposable
             _synchronizationContext.Post(
                 state =>
                     {
-                        HandlerExceptionOccurred?.Invoke(this, e);
-                        if (HandlerExceptionOccurred == null)
+                        _handlerExceptionOccurred?.Invoke(this, e);
+                        if (_handlerExceptionOccurred == null)
                         {
                             Console.WriteLine(
                                 $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
@@ -160,8 +241,8 @@ public class MessagingService : IMessagingService, IDisposable
         }
         else
         {
-            HandlerExceptionOccurred?.Invoke(this, e);
-            if (HandlerExceptionOccurred == null)
+            _handlerExceptionOccurred?.Invoke(this, e);
+            if (_handlerExceptionOccurred == null)
             {
                 Console.WriteLine(
                     $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
