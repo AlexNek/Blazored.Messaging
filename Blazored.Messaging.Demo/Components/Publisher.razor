@@ -1,18 +1,72 @@
-﻿@using Blazor.Messaging.Demo.Messages
+﻿@using Blazor.Messaging
+@using Blazor.Messaging.Demo.Messages
 @inject IMessagingService MessagingService
+@implements IDisposable
 
 <h3>Login Component</h3>
 
-<input @bind="username" placeholder="Enter username" />
-<button @onclick="PublishLogin">Log In</button>
+<input @bind="_username" placeholder="Enter username" />
+<button @onclick="PublishLogin" disabled="@_isPublishing">Log In</button>
+
+@if (_errorMessages.Any())
+{
+    <div style="color:red">
+        <p>Errors occurred:</p>
+        <ul>
+            @foreach (var error in _errorMessages)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    </div>
+}
 
 @code {
-    private string username = string.Empty;
+    private string _username = string.Empty;
+    private bool _isPublishing = false;
+    private List<string> _errorMessages = new();
+   
+
+    protected override void OnInitialized()
+    {
+        MessagingService.HandlerExceptionOccurred += OnHandlerExceptionOccurred;
+    }
+
+    private void OnHandlerExceptionOccurred(object? sender, HandlerExceptionEventArgs e)
+    {
+        // Aggregate exceptions with subscriber context
+        _errorMessages.Add($"{e.SubscriberInfo} - {e.Exception.Message}");
+        StateHasChanged();
+    }
 
     private async Task PublishLogin()
     {
-        var message = new UserLoggedInMessage { Username = username };
-        await MessagingService.Publish(message);
-        username = string.Empty;
+        _isPublishing = true;
+        _errorMessages.Clear(); // Reset errors for new publish attempt
+
+        try
+        {
+            var message = new UserLoggedInMessage { Username = _username };
+            await MessagingService.Publish(message);
+            _username = string.Empty;
+        }
+        catch (TimeoutException ex)
+        {
+            _errorMessages.Add($"Publish timeout: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessages.Add($"Unexpected error: {ex.Message}");
+        }
+        finally
+        {
+            _isPublishing = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        MessagingService.HandlerExceptionOccurred -= OnHandlerExceptionOccurred;
     }
 }

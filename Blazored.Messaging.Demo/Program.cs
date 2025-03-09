@@ -1,5 +1,7 @@
 using Blazor.Messaging.Demo.Components;
 
+using Microsoft.AspNetCore.Components;
+
 namespace Blazor.Messaging.Demo
 {
     public class Program
@@ -8,10 +10,17 @@ namespace Blazor.Messaging.Demo
         {
             var builder = WebApplication.CreateBuilder(args);
 
+           
             // Add services to the container.
             builder.Services.AddRazorComponents()
                 .AddInteractiveServerComponents();
-            builder.Services.AddSingleton<IMessagingService, MessagingService>();
+            //builder.Services.AddSingleton<IMessagingService, MessagingService>();
+            builder.Services.AddScoped<IMessagingService>(sp =>
+                {
+                    var synchronizationContext = SynchronizationContext.Current;
+
+                    return new MessagingService(synchronizationContext, TimeSpan.FromSeconds(10));
+                });
 
             var app = builder.Build();
 

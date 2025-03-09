@@ -1,17 +1,15 @@
-﻿namespace Blazor.Messaging;
-
-public class HandlerExceptionEventArgs : EventArgs
+﻿public class HandlerExceptionEventArgs : EventArgs
 {
+    public string SubscriberInfo { get; } // Format: "ClassName.FunctionName"
     public Exception Exception { get; }
-
-    public object Handler { get; } // Action or Func
-
     public Type MessageType { get; }
 
-    public HandlerExceptionEventArgs(Exception exception, Type messageType, object handler)
+    public HandlerExceptionEventArgs(string subscriberInfo, Exception exception, Type messageType)
     {
+        SubscriberInfo = subscriberInfo;
         Exception = exception;
         MessageType = messageType;
-        Handler = handler;
     }
+
+    public override string ToString() => $"Error in {SubscriberInfo} for {MessageType.Name}: {Exception.Message}";
 }

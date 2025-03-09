@@ -5,7 +5,7 @@ public interface IMessagingService
     // Optional: Event to notify about handler exceptions
     event EventHandler<HandlerExceptionEventArgs> HandlerExceptionOccurred;
 
-    Task Publish<TMessage>(TMessage message)
+    Task Publish<TMessage>(TMessage message, bool throwOnTimeout = false)
         where TMessage : class;
 
     void Subscribe<TMessage>(Action<TMessage> handler)
