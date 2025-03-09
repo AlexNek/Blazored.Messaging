@@ -21,6 +21,9 @@ Unlike other solutions, `Blazor.Messaging`  is designed to be versatile and can 
 - **Type-Safe**: Uses generics for compile-time safety.
 - **Exception Handling**: Optional `HandlerExceptionOccurred` event for managing handler errors.
 - **Lightweight**: No external dependencies, pure in-memory implementation.
+- **Duplicate Subscription Prevention**: Prevents duplicate subscriptions by the same subscriber.
+- **Timeout Handling**: Configurable timeout for long-running subscriber tasks.
+
 
 ## Installation
 Install via NuGet (once published) or reference locally:
@@ -33,7 +36,12 @@ dotnet add package Blazor.Messaging
 1. **Register the Service**: Add `MessagingService` to your DI container in `Program.cs` (Blazor Server or WebAssembly):
 
 ```csharp
-builder.Services.AddSingleton<IMessagingService, MessagingService>();
+builder.Services.AddScoped<IMessagingService>(sp =>
+{
+    var synchronizationContext = SynchronizationContext.Current;
+    return new MessagingService(synchronizationContext, TimeSpan.FromSeconds(10));
+});
+
 ```
 
 2. **Inject into Components**: Use `@inject` or constructor injection to access the service.
@@ -150,6 +158,12 @@ MessagingService.HandlerExceptionOccurred += (sender, e) =>
 };
 ```
 
+builder.Services.AddScoped<IMessagingService>(sp =>
+                {
+                    var synchronizationContext = SynchronizationContext.Current;
+
+                    return new MessagingService(synchronizationContext, TimeSpan.FromSeconds(10));
+                });
 
 
 ## API Reference
@@ -166,6 +180,8 @@ MessagingService.HandlerExceptionOccurred += (sender, e) =>
 - Stores subscribers in memory using dictionaries.
 - Executes handlers sequentially.
 - Logs unhandled exceptions to the console by default.
+- Prevents duplicate subscriptions.
+- Configurable timeout for long-running subscriber tasks.
 
 ## Notes
 - **Lifecycle Management**: Unsubscribe in `Dispose` to avoid memory leaks in Blazor components.
@@ -176,3 +192,7 @@ Contributions welcome! Submit issues or PRs to improve the library.
 
 ## License
 Licensed under the **Apache License 2.0** - see [LICENSE](LICENSE) for details.
+
+## Version History
+- **v1.0.0**: Initial release.
+- **v1.1.0**: Added prevntion of duplicate subscriptions and long running task timiout.
