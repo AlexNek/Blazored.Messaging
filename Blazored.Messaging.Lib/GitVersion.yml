@@ -3,7 +3,10 @@ mode: ContinuousDeployment
 next-version: 1.1.0
 branches:
   master:
-    is-mainline: true
+    regex: ^master$
+    is-release-branch: true
+  develop:
+    regex: ^develop$
 
 ignore:
   sha: []
