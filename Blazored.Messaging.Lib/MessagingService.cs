@@ -7,43 +7,8 @@ public class MessagingService : IMessagingService, IDisposable
 {
     public event EventHandler<HandlerExceptionEventArgs>? HandlerExceptionOccurred
     {
-        add
-        {
-            if (value != null)
-            {
-                lock (_exceptionHandlerIds)
-                {
-                    int handlerId = value.GetHashCode();
-                    if (_exceptionHandlerIds.Add(handlerId))
-                    {
-                        _handlerExceptionOccurred += value;
-                        Debug.WriteLine(
-                            $"Added handler ID {handlerId}. Total handlers: {_exceptionHandlerIds.Count}");
-                    }
-                    else
-                    {
-                        Debug.WriteLine(
-                            $"Handler ID {handlerId} already exists. Skipping duplicate.");
-                    }
-                }
-            }
-        }
-        remove
-        {
-            if (value != null)
-            {
-                lock (_exceptionHandlerIds)
-                {
-                    int handlerId = value.GetHashCode();
-                    if (_exceptionHandlerIds.Remove(handlerId))
-                    {
-                        _handlerExceptionOccurred -= value;
-                        Debug.WriteLine(
-                            $"Removed handler ID {handlerId}. Total handlers: {_exceptionHandlerIds.Count}");
-                    }
-                }
-            }
-        }
+        add => _exceptionHandlerManager.Event += value;
+        remove => _exceptionHandlerManager.Event -= value;
     }
 
     private readonly Dictionary<Type, List<(string SubscriberInfo, Func<object, Task> Handler)>>
@@ -52,7 +17,8 @@ public class MessagingService : IMessagingService, IDisposable
     /// <summary>
     /// Use HashSet to track unique subscribers by their hash code
     /// </summary>
-    private readonly HashSet<int> _exceptionHandlerIds = new();
+    private readonly UniqueEventHandlerManager<HandlerExceptionEventArgs> _exceptionHandlerManager =
+        new();
 
     private readonly TimeSpan _handlerTimeout;
 
@@ -65,8 +31,6 @@ public class MessagingService : IMessagingService, IDisposable
 
     private readonly Dictionary<Type, List<(string SubscriberInfo, Action<object> Handler)>>
         _syncSubscribers = new();
-
-    private EventHandler<HandlerExceptionEventArgs>? _handlerExceptionOccurred;
 
     private bool _isRunning = true;
 
@@ -230,8 +194,8 @@ public class MessagingService : IMessagingService, IDisposable
             _synchronizationContext.Post(
                 state =>
                     {
-                        _handlerExceptionOccurred?.Invoke(this, e);
-                        if (_handlerExceptionOccurred == null)
+                        _exceptionHandlerManager.Invoke(this, e);
+                        if (!_exceptionHandlerManager.HasSubscribers)
                         {
                             Console.WriteLine(
                                 $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
@@ -241,8 +205,8 @@ public class MessagingService : IMessagingService, IDisposable
         }
         else
         {
-            _handlerExceptionOccurred?.Invoke(this, e);
-            if (_handlerExceptionOccurred == null)
+            _exceptionHandlerManager.Invoke(this, e);
+            if (!_exceptionHandlerManager.HasSubscribers)
             {
                 Console.WriteLine(
                     $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
@@ -311,7 +275,7 @@ public class MessagingService : IMessagingService, IDisposable
                     subscriberInfo,
                     messageType,
                     token,
-                    tcs);
+                    tcs); 
             }
 
             using (cts.Token.Register(
@@ -392,8 +356,13 @@ public class MessagingService : IMessagingService, IDisposable
             }
             else
             {
-                // Blazor WASM
-                ExecuteSyncCallback(handler, message, subscriberInfo, messageType, token, tcs);
+                ExecuteSyncCallback(
+                    handler,
+                    message,
+                    subscriberInfo,
+                    messageType,
+                    token,
+                    tcs); // Blazor WASM
             }
 
             using (cts.Token.Register(
