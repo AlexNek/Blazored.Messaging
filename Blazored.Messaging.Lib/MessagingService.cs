@@ -250,6 +250,34 @@ public class MessagingService : IMessagingService, IDisposable
         }
     }
 
+    private async Task ExecuteAsyncCallback(
+        Func<object, Task> handler,
+        object message,
+        string subscriberInfo,
+        Type messageType,
+        CancellationToken token,
+        TaskCompletionSource<bool> tcs)
+    {
+        Debug.WriteLine(
+            $"ExecuteAsyncHandler Callback - Thread ID: {Thread.CurrentThread.ManagedThreadId}");
+        if (token.IsCancellationRequested)
+        {
+            tcs.TrySetCanceled();
+            return;
+        }
+
+        try
+        {
+            await handler(message);
+            tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+            OnHandlerException(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
+            tcs.TrySetResult(false);
+        }
+    }
+
     private async Task ExecuteAsyncHandler(
         Func<object, Task> handler,
         object message,
@@ -258,38 +286,32 @@ public class MessagingService : IMessagingService, IDisposable
     {
         using var cts = new CancellationTokenSource(_handlerTimeout);
         var tcs = new TaskCompletionSource<bool>();
-
-        async void Callback(object? _)
-        {
-            Debug.WriteLine(
-                $"ExecuteAsyncHandler Callback - Thread ID: {Thread.CurrentThread.ManagedThreadId}");
-            if (cts.Token.IsCancellationRequested)
-            {
-                tcs.TrySetCanceled();
-                return;
-            }
-
-            try
-            {
-                await handler(message);
-                tcs.TrySetResult(true);
-            }
-            catch (Exception ex)
-            {
-                OnHandlerException(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
-                tcs.TrySetResult(false);
-            }
-        }
+        var token = cts.Token; // Capture the token before disposal
 
         try
         {
             if (_synchronizationContext != null)
             {
-                _synchronizationContext.Post(Callback, null);
+                _synchronizationContext.Post(
+                    _ => ExecuteAsyncCallback(
+                        handler,
+                        message,
+                        subscriberInfo,
+                        messageType,
+                        token,
+                        tcs),
+                    null);
             }
             else
             {
-                Callback(null); // Blazor WASM
+                // Blazor WASM
+                await ExecuteAsyncCallback(
+                    handler,
+                    message,
+                    subscriberInfo,
+                    messageType,
+                    token,
+                    tcs);
             }
 
             using (cts.Token.Register(
@@ -316,6 +338,34 @@ public class MessagingService : IMessagingService, IDisposable
         }
     }
 
+    private void ExecuteSyncCallback(
+        Action<object> handler,
+        object message,
+        string subscriberInfo,
+        Type messageType,
+        CancellationToken token,
+        TaskCompletionSource<bool> tcs)
+    {
+        Debug.WriteLine(
+            $"ExecuteSyncHandler Callback - Thread ID: {Thread.CurrentThread.ManagedThreadId}");
+        if (token.IsCancellationRequested)
+        {
+            tcs.TrySetCanceled();
+            return;
+        }
+
+        try
+        {
+            handler(message);
+            tcs.TrySetResult(true);
+        }
+        catch (Exception ex)
+        {
+            OnHandlerException(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
+            tcs.TrySetResult(false);
+        }
+    }
+
     private async Task ExecuteSyncHandler(
         Action<object> handler,
         object message,
@@ -324,38 +374,26 @@ public class MessagingService : IMessagingService, IDisposable
     {
         using var cts = new CancellationTokenSource(_handlerTimeout);
         var tcs = new TaskCompletionSource<bool>();
-
-        void Callback(object? _)
-        {
-            Debug.WriteLine(
-                $"ExecuteSyncHandler Callback - Thread ID: {Thread.CurrentThread.ManagedThreadId}");
-            if (cts.Token.IsCancellationRequested)
-            {
-                tcs.TrySetCanceled();
-                return;
-            }
-
-            try
-            {
-                handler(message);
-                tcs.TrySetResult(true);
-            }
-            catch (Exception ex)
-            {
-                OnHandlerException(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
-                tcs.TrySetResult(false);
-            }
-        }
+        var token = cts.Token; // Capture the token before disposal
 
         try
         {
             if (_synchronizationContext != null)
             {
-                _synchronizationContext.Post(Callback, null);
+                _synchronizationContext.Post(
+                    _ => ExecuteSyncCallback(
+                        handler,
+                        message,
+                        subscriberInfo,
+                        messageType,
+                        token,
+                        tcs),
+                    null);
             }
             else
             {
-                Callback(null); // Blazor WASM
+                // Blazor WASM
+                ExecuteSyncCallback(handler, message, subscriberInfo, messageType, token, tcs);
             }
 
             using (cts.Token.Register(
