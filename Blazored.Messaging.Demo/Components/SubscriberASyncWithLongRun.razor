@@ -11,6 +11,7 @@
 
     private async Task ASyncHandler(UserLoggedInMessage message)
     {
+        Console.WriteLine("AsyncHandler with hang");
         // Simulate a non-blocking delay if needed
         await Task.Delay(3600 * 100);
 
