@@ -275,7 +275,7 @@ public class MessagingService : IMessagingService, IDisposable
                     subscriberInfo,
                     messageType,
                     token,
-                    tcs); 
+                    tcs);
             }
 
             using (cts.Token.Register(
@@ -400,6 +400,13 @@ public class MessagingService : IMessagingService, IDisposable
         return $"{className}.{methodName}";
     }
 
+    private class HandlerTaskInfo
+    {
+        public string SubscriberId { get; set; }
+
+        public Task Task { get; set; }
+    }
+
     private async Task ProcessMessages()
     {
         while (_isRunning || !_messageQueue.IsEmpty)
@@ -407,33 +414,94 @@ public class MessagingService : IMessagingService, IDisposable
             if (_messageQueue.TryDequeue(out var item))
             {
                 var (msgType, message, tcs) = item;
-                var tasks = new List<Task>();
+                var taskInfos = new List<HandlerTaskInfo>();
 
                 if (_syncSubscribers.TryGetValue(msgType, out var syncSubscribers))
                 {
                     var syncList = syncSubscribers.ToList();
-                    foreach (var (subscriberInfo, handler) in syncList)
+                    foreach (var (subscriberId, handler) in syncList) // SubscriberId is now string
                     {
-                        tasks.Add(ExecuteSyncHandler(handler, message, subscriberInfo, msgType));
+                        taskInfos.Add(
+                            new HandlerTaskInfo
+                                {
+                                    Task = ExecuteSyncHandler(
+                                        handler,
+                                        message,
+                                        subscriberId,
+                                        msgType),
+                                    SubscriberId = subscriberId
+                                });
                     }
                 }
 
                 if (_asyncSubscribers.TryGetValue(msgType, out var asyncSubscribers))
                 {
                     var asyncList = asyncSubscribers.ToList();
-                    foreach (var (subscriberInfo, handler) in asyncList)
+                    foreach (var (subscriberId, handler) in asyncList) // SubscriberId is now string
                     {
-                        tasks.Add(ExecuteAsyncHandler(handler, message, subscriberInfo, msgType));
+                        taskInfos.Add(
+                            new HandlerTaskInfo
+                                {
+                                    Task = ExecuteAsyncHandler(
+                                        handler,
+                                        message,
+                                        subscriberId,
+                                        msgType),
+                                    SubscriberId = subscriberId
+                                });
                     }
                 }
 
-                await Task.WhenAll(tasks);
-                tcs.SetResult(true);
+                try
+                {
+                    await RunWithTimeout(taskInfos, _handlerTimeout, msgType);
+                    tcs.SetResult(true);
+                }
+                catch (TimeoutException)
+                {
+                    tcs.SetResult(false);
+                }
+                catch (Exception)
+                {
+                    tcs.SetResult(false);
+                }
             }
             else
             {
                 await Task.Delay(10);
             }
         }
+    }
+
+    private async Task RunWithTimeout(
+        List<HandlerTaskInfo> taskInfos,
+        TimeSpan timeout,
+        Type messageType)
+    {
+        var tasks = taskInfos.Select(t => t.Task).ToArray();
+
+        // it is fallback only for main timeout handler, so give main timeouts time for execution
+        var timeoutTask = Task.Delay(timeout + TimeSpan.FromSeconds(1));
+        var completedTask = await Task.WhenAny(Task.WhenAll(tasks), timeoutTask);
+
+        if (completedTask == timeoutTask)
+        {
+            // Timeout occurred
+            var unfinishedTasks = taskInfos.Where(t => !t.Task.IsCompleted).ToList();
+            foreach (var taskInfo in unfinishedTasks)
+            {
+                OnHandlerException(
+                    new HandlerExceptionEventArgs(
+                        taskInfo.SubscriberId, // SubscriberId is now string
+                        new TimeoutException(
+                            $"Async handler timed out after {timeout.TotalMilliseconds}ms"),
+                        messageType));
+            }
+
+            throw new TimeoutException(
+                $"Async handler timed out after {timeout.TotalMilliseconds}ms");
+        }
+
+        await Task.WhenAll(tasks); // Ensure exceptions are propagated.
     }
 }
