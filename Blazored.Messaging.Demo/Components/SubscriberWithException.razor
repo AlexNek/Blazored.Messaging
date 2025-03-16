@@ -8,34 +8,55 @@
 <p>@_notification</p>
 
 @code {
+
     private string _notification = "Waiting for login...";
+
+    [Inject]
+    public IHttpContextAccessor HttpContextAccessor { get; set; }
+
+    /// <summary>
+    /// Check for prerendering mode. Version for .NET 8
+    /// </summary>
+    private bool IsPrerendering
+    {
+        get
+        {
+            return HttpContextAccessor.HttpContext?.Response.HasStarted == false;
+        }
+    }
 
     private void SyncHandler(UserLoggedInMessage message)
     {
         _notification = $"{message.Username} has logged in!";
         StateHasChanged();
         Console.WriteLine("SyncHandler throw exception");
-        throw new Exception("An error occurred in the handler");
+        throw new Exception("An error occurred in the sync handler");
     }
 
-    // protected override void OnInitialized()
-    // {
-    //     MessagingService.Subscribe<UserLoggedInMessage>(SyncHandler);
-    // }
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnInitialized()
     {
-        await base.OnAfterRenderAsync(firstRender);
-        if (firstRender)
+        if (!IsPrerendering)
         {
-            //don't use OnInitialzedXxx as it will be called by prerendering too
             MessagingService.Subscribe<UserLoggedInMessage>(SyncHandler);
-            Debug.WriteLine("Subscribed to UserLoggedInMessage in OnAfterRenderAsync");
+            Debug.WriteLine("Subscribed to UserLoggedInMessage in OnInitialized after prerendering");
         }
     }
+
+    // protected override async Task OnAfterRenderAsync(bool firstRender)
+    // {
+    //     await base.OnAfterRenderAsync(firstRender);
+    //     if (firstRender)
+    //     {
+    //         //don't use OnInitialzedXxx as it will be called by prerendering too
+    //         MessagingService.Subscribe<UserLoggedInMessage>(SyncHandler);
+    //         Debug.WriteLine("Subscribed to UserLoggedInMessage in OnAfterRenderAsync");
+    //     }
+    // }
 
     public void Dispose()
     {
         MessagingService.Unsubscribe<UserLoggedInMessage>(SyncHandler);
         Debug.WriteLine("UnSubscribe from UserLoggedInMessage in Dispose");
     }
+
 }

@@ -1,7 +1,7 @@
 ﻿@inject IMessagingService MessagingService
 @using Blazor.Messaging.Demo.Messages
 @implements IDisposable
-
+@* @inject Microsoft.AspNetCore.Components.IComponentRenderMode RenderMode *@
 <h3>Notification Component with hang</h3>
 
 <p>@notification</p>
@@ -9,6 +9,17 @@
 @code {
     private string notification = "Waiting for login...";
 
+    /// <summary>
+    /// Check for prerendering mode. Version for .NET 9
+    /// </summary>
+    private bool IsPrerendering
+    {
+        get
+        {
+            // True if not interactive (prerendering or static) AND an interactive mode is assigned (excludes static SSR)
+            return !RendererInfo.IsInteractive && AssignedRenderMode != null;
+        }
+    }
     private async Task ASyncHandler(UserLoggedInMessage message)
     {
         Console.WriteLine("AsyncHandler with hang");
@@ -21,7 +32,17 @@
 
     protected override void OnInitialized()
     {
-        MessagingService.Subscribe<UserLoggedInMessage>(ASyncHandler);
+        // // Check for prerendering mode. Version for .NET 9
+        // if (RenderMode is InteractiveServerRenderMode)
+        // {
+        //     MessagingService.Subscribe<UserLoggedInMessage>(ASyncHandler);
+        // }
+
+        // use the same pattern as before
+        if (!IsPrerendering)
+        {
+            MessagingService.Subscribe<UserLoggedInMessage>(ASyncHandler);
+        }
     }
 
     public void Dispose()

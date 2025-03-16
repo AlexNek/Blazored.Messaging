@@ -22,6 +22,9 @@ namespace Blazor.Messaging.Demo
                     return new MessagingService(synchronizationContext, TimeSpan.FromSeconds(10));
                 });
 
+            // for prerendering check
+            builder.Services.AddHttpContextAccessor();
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
