@@ -7,7 +7,10 @@
 <h3>Login Component</h3>
 
 <input @bind="_username" placeholder="Enter username" />
-<button @onclick="PublishLogin" disabled="@_isPublishing">Log In</button>
+@if (!_isPrerendering)
+{
+    <button @onclick="PublishLogin" disabled="@(_isPublishing)">Log In</button>
+}
 
 @if (_errorMessages.Any())
 {
@@ -26,8 +29,27 @@
     private string _username = string.Empty;
     private bool _isPublishing = false;
     private List<string> _errorMessages = new();
-   
-   
+
+    private bool _isPrerendering = true; 
+
+    /// <summary>
+    /// Check for prerendering mode. Version for .NET 9
+    /// </summary>
+    private bool IsPrerendering
+    {
+        get
+        {
+            // True if not interactive (prerendering or static) AND an interactive mode is assigned (excludes static SSR)
+            return !RendererInfo.IsInteractive && AssignedRenderMode != null;
+        }
+    }
+
+   protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        _isPrerendering = IsPrerendering;
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
