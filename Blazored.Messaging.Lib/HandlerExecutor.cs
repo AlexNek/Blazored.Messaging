@@ -4,14 +4,16 @@ namespace Blazor.Messaging;
 
 public class HandlerExecutor
 {
-    private readonly SynchronizationContext? _synchronizationContext;
+    private readonly Action<HandlerException> _exceptionHandler;
+
     private readonly TimeSpan _handlerTimeout;
-    private readonly Action<HandlerExceptionEventArgs> _exceptionHandler;
+
+    private readonly SynchronizationContext? _synchronizationContext;
 
     public HandlerExecutor(
         SynchronizationContext? synchronizationContext,
         TimeSpan handlerTimeout,
-        Action<HandlerExceptionEventArgs> exceptionHandler)
+        Action<HandlerException> exceptionHandler)
     {
         _synchronizationContext = synchronizationContext;
         _handlerTimeout = handlerTimeout;
@@ -59,7 +61,7 @@ public class HandlerExecutor
                                if (!tcs.Task.IsCompleted)
                                {
                                    _exceptionHandler(
-                                       new HandlerExceptionEventArgs(
+                                       new HandlerException(
                                            subscriberInfo,
                                            new TimeoutException(
                                                $"Async handler timed out after {_handlerTimeout.TotalMilliseconds}ms"),
@@ -73,7 +75,7 @@ public class HandlerExecutor
         }
         catch (Exception ex)
         {
-            _exceptionHandler(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
+            _exceptionHandler(new HandlerException(subscriberInfo, ex, messageType));
         }
     }
 
@@ -118,7 +120,7 @@ public class HandlerExecutor
                                if (!tcs.Task.IsCompleted)
                                {
                                    _exceptionHandler(
-                                       new HandlerExceptionEventArgs(
+                                       new HandlerException(
                                            subscriberInfo,
                                            new TimeoutException(
                                                $"Sync handler timed out after {_handlerTimeout.TotalMilliseconds}ms"),
@@ -132,7 +134,7 @@ public class HandlerExecutor
         }
         catch (Exception ex)
         {
-            _exceptionHandler(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
+            _exceptionHandler(new HandlerException(subscriberInfo, ex, messageType));
         }
     }
 
@@ -159,7 +161,7 @@ public class HandlerExecutor
         }
         catch (Exception ex)
         {
-            _exceptionHandler(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
+            _exceptionHandler(new HandlerException(subscriberInfo, ex, messageType));
             tcs.TrySetResult(false);
         }
     }
@@ -187,7 +189,7 @@ public class HandlerExecutor
         }
         catch (Exception ex)
         {
-            _exceptionHandler(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
+            _exceptionHandler(new HandlerException(subscriberInfo, ex, messageType));
             tcs.TrySetResult(false);
         }
     }

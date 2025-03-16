@@ -166,6 +166,11 @@ builder.Services.AddScoped<IMessagingService>(sp =>
                 });
 
 
+### Handling Timeouts
+Occasionally, subscribers may take an extended period to complete. You can establish a global timeout for all subscribers by configuring a `MessagingService`.
+In certain scenarios, such as handler debugging, all handlers may not execute if additional threads are not used.
+If you encounter a timeout message with a duration exceeding the combined value of the global timeout and `MessagingService.AdditionalTimeoutDuration`, it indicates that the timeout was triggered by the global handler.
+
 ## API Reference
 
 ### `IMessagingService`
@@ -198,3 +203,4 @@ Licensed under the **Apache License 2.0** - see [LICENSE](LICENSE) for details.
 - **v1.1.0**: Added prevention of duplicate subscriptions and long running task timiout.
 - **v1.2.0**: Missed file - SubscriberException.
 - **v1.2.1**: Downgrade to .NET 8.0.
+- **v1.3.0**: improvements for breakpoint debugging on subscription handler

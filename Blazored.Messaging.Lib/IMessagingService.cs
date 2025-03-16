@@ -18,5 +18,5 @@ public interface IMessagingService : IMessagePublisher, IMessageSubscriber
     /// };
     /// </code>
     /// </example>
-    event EventHandler<HandlerExceptionEventArgs>? HandlerExceptionOccurred;
+    event EventHandler<HandlerException>? HandlerExceptionOccurred;
 }
