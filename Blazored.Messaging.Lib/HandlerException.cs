@@ -1,4 +1,6 @@
-﻿public class HandlerException : EventArgs
+﻿namespace Blazor.Messaging;
+
+public class HandlerException : EventArgs
 {
     public Exception Exception { get; }
 
