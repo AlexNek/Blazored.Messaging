@@ -1,5 +1,6 @@
 ﻿using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace Blazor.Messaging;
 
@@ -11,16 +12,28 @@ public class MessagingService : IMessagingService, IDisposable
         remove => _exceptionHandlerManager.Event -= value;
     }
 
-    private readonly Dictionary<Type, List<(string SubscriberInfo, Func<object, Task> Handler)>> _asyncSubscribers = new();
+    private readonly Dictionary<Type, List<(string SubscriberInfo, Func<object, Task> Handler)>>
+        _asyncSubscribers = new();
+
     private readonly UniqueEventHandlerManager<HandlerException> _exceptionHandlerManager = new();
+
     private readonly HandlerExecutor _handlerExecutor;
+
     private readonly TimeSpan _handlerTimeout;
-    private readonly ConcurrentQueue<(Type MsgType, object Msg, TaskCompletionSource<bool> Tcs)> _messageQueue = new();
-    private readonly Task _processorTask;
-    private readonly SynchronizationContext? _synchronizationContext;
-    private readonly Dictionary<Type, List<(string SubscriberInfo, Action<object> Handler)>> _syncSubscribers = new();
-    private bool _isRunning = true;
+
     private readonly MessageProcessor _messageProcessor;
+
+    private readonly ConcurrentQueue<(Type MsgType, object Msg, TaskCompletionSource<bool> Tcs)>
+        _messageQueue = new();
+
+    private readonly Task _processorTask;
+
+    private readonly SynchronizationContext? _synchronizationContext;
+
+    private readonly Dictionary<Type, List<(string SubscriberInfo, Action<object> Handler)>>
+        _syncSubscribers = new();
+
+    private bool _isRunning = true;
 
     public static TimeSpan AdditionalTimeoutDuration { get; } = TimeSpan.FromMilliseconds(100);
 
@@ -63,7 +76,8 @@ public class MessagingService : IMessagingService, IDisposable
         _processorTask.Wait();
     }
 
-    public Task Publish<TMessage>(TMessage message, bool throwOnTimeout = false) where TMessage : class
+    public Task Publish<TMessage>(TMessage message, bool throwOnTimeout = false)
+        where TMessage : class
     {
         if (message == null)
         {
@@ -77,22 +91,23 @@ public class MessagingService : IMessagingService, IDisposable
         {
             return Task.WhenAny(tcs.Task, Task.Delay(_handlerTimeout)).ContinueWith(
                 t =>
-                {
-                    if (!tcs.Task.IsCompleted)
                     {
-                        throw new TimeoutException(
-                            $"Publishing {typeof(TMessage).Name} timed out after {_handlerTimeout.TotalMilliseconds}ms.");
-                    }
-                });
+                        if (!tcs.Task.IsCompleted)
+                        {
+                            throw new TimeoutException(
+                                $"Publishing {typeof(TMessage).Name} timed out after {_handlerTimeout.TotalMilliseconds}ms.");
+                        }
+                    });
         }
 
         return tcs.Task;
     }
 
-    public void Subscribe<TMessage>(Action<TMessage> handler) where TMessage : class
+    public void Subscribe<TMessage>(Action<TMessage> handler)
+        where TMessage : class
     {
         var messageType = typeof(TMessage);
-        string subscriberInfo = $"{GetSubscriberInfo()}::{handler.Method.Name}";
+        string subscriberInfo = GetMethodInfo(handler.Method);
         Action<object> wrappedHandler = msg => handler((TMessage)msg);
 
         lock (_syncSubscribers)
@@ -116,10 +131,11 @@ public class MessagingService : IMessagingService, IDisposable
         }
     }
 
-    public void Subscribe<TMessage>(Func<TMessage, Task> handler) where TMessage : class
+    public void Subscribe<TMessage>(Func<TMessage, Task> handler)
+        where TMessage : class
     {
         var messageType = typeof(TMessage);
-        string subscriberInfo = $"{GetSubscriberInfo()}::{handler.Method.Name}";
+        string subscriberInfo = GetMethodInfo(handler.Method);
         Func<object, Task> wrappedHandler = msg => handler((TMessage)msg);
 
         lock (_asyncSubscribers)
@@ -143,10 +159,11 @@ public class MessagingService : IMessagingService, IDisposable
         }
     }
 
-    public void Unsubscribe<TMessage>(Action<TMessage> handler) where TMessage : class
+    public void Unsubscribe<TMessage>(Action<TMessage> handler)
+        where TMessage : class
     {
         var messageType = typeof(TMessage);
-        string subscriberInfo = $"{GetSubscriberInfo()}::{handler.Method.Name}";
+        string subscriberInfo = GetMethodInfo(handler.Method);
 
         lock (_syncSubscribers)
         {
@@ -157,10 +174,11 @@ public class MessagingService : IMessagingService, IDisposable
         }
     }
 
-    public void Unsubscribe<TMessage>(Func<TMessage, Task> handler) where TMessage : class
+    public void Unsubscribe<TMessage>(Func<TMessage, Task> handler)
+        where TMessage : class
     {
         var messageType = typeof(TMessage);
-        string subscriberInfo = $"{GetSubscriberInfo()}::{handler.Method.Name}";
+        string subscriberInfo = GetMethodInfo(handler.Method);
 
         lock (_asyncSubscribers)
         {
@@ -177,14 +195,14 @@ public class MessagingService : IMessagingService, IDisposable
         {
             _synchronizationContext.Post(
                 state =>
-                {
-                    _exceptionHandlerManager.Invoke(this, e);
-                    if (!_exceptionHandlerManager.HasSubscribers)
                     {
-                        Console.WriteLine(
-                            $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
-                    }
-                },
+                        _exceptionHandlerManager.Invoke(this, e);
+                        if (!_exceptionHandlerManager.HasSubscribers)
+                        {
+                            Console.WriteLine(
+                                $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
+                        }
+                    },
                 null);
         }
         else
@@ -196,6 +214,11 @@ public class MessagingService : IMessagingService, IDisposable
                     $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
             }
         }
+    }
+
+    private static string GetMethodInfo(MethodInfo handlerMethod)
+    {
+        return $"{handlerMethod.DeclaringType?.Name}::{handlerMethod.Name}";
     }
 
     private string GetSubscriberInfo()
@@ -210,8 +233,7 @@ public class MessagingService : IMessagingService, IDisposable
     private class HandlerTaskInfo
     {
         public string SubscriberId { get; set; } = string.Empty;
+
         public Task Task { get; set; } = Task.CompletedTask;
     }
-
-   
 }

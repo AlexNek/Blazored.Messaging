@@ -75,7 +75,7 @@ public class MessagingServiceTests : IDisposable
         // Assert
         receivedException.Should().NotBeNull("a timeout exception should have been raised");
         receivedException.Should().BeOfType<TimeoutException>();
-        receivedException!.Message.Should().Contain($"Async handler timed out after {globalTimeout.TotalMilliseconds}ms");
+        receivedException!.Message.Should().Contain($"Handler for System.String timed out after {globalTimeout.TotalMilliseconds}ms");
     }
 
     [Fact]

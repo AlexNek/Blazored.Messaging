@@ -170,7 +170,6 @@ builder.Services.AddScoped<IMessagingService>(sp =>
 Occasionally, subscribers may take an extended period to complete. You can establish a global timeout for all subscribers by configuring a `MessagingService`.
 In certain scenarios, such as handler debugging, all handlers may not execute if additional threads are not used.
 If you encounter a timeout message with a duration exceeding the combined value of the global timeout and `MessagingService.AdditionalTimeoutDuration`, it indicates that the timeout was triggered by the global handler.
-Only subsription placement could be used for identifing the source of the timeout.
 
 ## API Reference
 

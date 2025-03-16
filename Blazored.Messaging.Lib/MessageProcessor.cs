@@ -106,11 +106,11 @@ public class MessageProcessor
                 _onHandlerException(
                     new HandlerException(
                         taskInfo.SubscriberId,
-                        new TimeoutException($"Async handler timed out after {newTimeout.TotalMilliseconds}ms"),
+                        new TimeoutException($"Handler for {messageType} timed out after {newTimeout.TotalMilliseconds}ms"),
                         messageType));
             }
 
-            throw new TimeoutException($"Async handler timed out after {newTimeout.TotalMilliseconds}ms");
+            throw new TimeoutException($"Handler timed out after {newTimeout.TotalMilliseconds}ms");
         }
 
         await Task.WhenAll(tasks); // Ensure exceptions are propagated.
