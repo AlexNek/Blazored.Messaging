@@ -204,3 +204,4 @@ Licensed under the **Apache License 2.0** - see [LICENSE](LICENSE) for details.
 - **v1.2.0**: Missed file - SubscriberException.
 - **v1.2.1**: Downgrade to .NET 8.0.
 - **v1.3.0**: improvements for breakpoint debugging on subscription handler
+- **V1.3.1**: Rename back HandlerExceptionEventArgs

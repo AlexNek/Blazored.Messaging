@@ -6,7 +6,7 @@ namespace Blazor.Messaging;
 
 public class MessagingService : IMessagingService, IDisposable
 {
-    public event EventHandler<HandlerException>? HandlerExceptionOccurred
+    public event EventHandler<HandlerExceptionEventArgs>? HandlerExceptionOccurred
     {
         add => _exceptionHandlerManager.Event += value;
         remove => _exceptionHandlerManager.Event -= value;
@@ -15,7 +15,7 @@ public class MessagingService : IMessagingService, IDisposable
     private readonly Dictionary<Type, List<(string SubscriberInfo, Func<object, Task> Handler)>>
         _asyncSubscribers = new();
 
-    private readonly UniqueEventHandlerManager<HandlerException> _exceptionHandlerManager = new();
+    private readonly UniqueEventHandlerManager<HandlerExceptionEventArgs> _exceptionHandlerManager = new();
 
     private readonly HandlerExecutor _handlerExecutor;
 
@@ -189,7 +189,7 @@ public class MessagingService : IMessagingService, IDisposable
         }
     }
 
-    protected virtual void OnHandlerException(HandlerException e)
+    protected virtual void OnHandlerException(HandlerExceptionEventArgs e)
     {
         if (_synchronizationContext != null)
         {

@@ -61,7 +61,7 @@
         }
     }
 
-    private void OnHandlerExceptionOccurred(object? sender, HandlerException e)
+    private void OnHandlerExceptionOccurred(object? sender, HandlerExceptionEventArgs e)
     {
         _errorMessages.Add($"{e.SubscriberInfo} - {e.Exception.Message}");
         Debug.WriteLine($"Exception logged: {e.SubscriberInfo} - {e.Exception.Message}");

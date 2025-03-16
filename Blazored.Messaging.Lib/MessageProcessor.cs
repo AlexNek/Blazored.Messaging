@@ -10,7 +10,7 @@ public class MessageProcessor
     private readonly HandlerExecutor _handlerExecutor;
     private readonly TimeSpan _handlerTimeout;
     private readonly Func<bool> _isRunning;
-    private readonly Action<HandlerException> _onHandlerException; // Delegate to call OnHandlerException
+    private readonly Action<HandlerExceptionEventArgs> _onHandlerException; // Delegate to call OnHandlerException
 
     public MessageProcessor(
         ConcurrentQueue<(Type MsgType, object Msg, TaskCompletionSource<bool> Tcs)> messageQueue,
@@ -19,7 +19,7 @@ public class MessageProcessor
         HandlerExecutor handlerExecutor,
         TimeSpan handlerTimeout,
         Func<bool> isRunning,
-        Action<HandlerException> onHandlerException) // Added to access OnHandlerException
+        Action<HandlerExceptionEventArgs> onHandlerException) // Added to access OnHandlerException
     {
         _messageQueue = messageQueue;
         _syncSubscribers = syncSubscribers;
@@ -104,7 +104,7 @@ public class MessageProcessor
             foreach (var taskInfo in unfinishedTasks)
             {
                 _onHandlerException(
-                    new HandlerException(
+                    new HandlerExceptionEventArgs(
                         taskInfo.SubscriberId,
                         new TimeoutException($"Handler for {messageType} timed out after {newTimeout.TotalMilliseconds}ms"),
                         messageType));
