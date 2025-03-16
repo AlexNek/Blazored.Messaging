@@ -14,11 +14,10 @@ public class MessagingService : IMessagingService, IDisposable
     private readonly Dictionary<Type, List<(string SubscriberInfo, Func<object, Task> Handler)>>
         _asyncSubscribers = new();
 
-    /// <summary>
-    /// Use HashSet to track unique subscribers by their hash code
-    /// </summary>
     private readonly UniqueEventHandlerManager<HandlerExceptionEventArgs> _exceptionHandlerManager =
         new();
+
+    private readonly HandlerExecutor _handlerExecutor;
 
     private readonly TimeSpan _handlerTimeout;
 
@@ -34,6 +33,9 @@ public class MessagingService : IMessagingService, IDisposable
 
     private bool _isRunning = true;
 
+    public static TimeSpan AdditionalTimeoutDuration { get; } = TimeSpan.FromMilliseconds(100);
+
+    // Constructor maintained as requested
     public MessagingService(
         SynchronizationContext? synchronizationContext = null,
         TimeSpan? handlerTimeout = null)
@@ -49,6 +51,11 @@ public class MessagingService : IMessagingService, IDisposable
                 nameof(handlerTimeout),
                 "Timeout cannot be negative.");
         }
+
+        _handlerExecutor = new HandlerExecutor(
+            _synchronizationContext,
+            _handlerTimeout,
+            OnHandlerException);
 
         _processorTask = Task.Run(ProcessMessages);
     }
@@ -67,22 +74,11 @@ public class MessagingService : IMessagingService, IDisposable
             throw new ArgumentNullException(nameof(message));
         }
 
-        // Create a TaskCompletionSource to represent the completion of the message handling.
-        // This task will be completed by the consumer that processes the message.
         var tcs = new TaskCompletionSource<bool>();
-
-        // Enqueue the message into the message queue for processing.
-        // The tuple contains:
-        // - The type of the message (for identifying the message type),
-        // - The actual message object,
-        // - The TaskCompletionSource that will be completed when processing is done.
         _messageQueue.Enqueue((typeof(TMessage), message, tcs));
 
         if (throwOnTimeout)
         {
-            // Use Task.WhenAny to wait for either:
-            // - The tcs.Task to complete (indicating successful processing of the message),
-            // - Or a Task.Delay to complete (indicating a timeout has occurred).
             return Task.WhenAny(tcs.Task, Task.Delay(_handlerTimeout)).ContinueWith(
                 t =>
                     {
@@ -94,8 +90,6 @@ public class MessagingService : IMessagingService, IDisposable
                     });
         }
 
-        // If throwOnTimeout is false, simply return the TaskCompletionSource's task.
-        // The caller can await this task and handle it as needed.
         return tcs.Task;
     }
 
@@ -113,7 +107,6 @@ public class MessagingService : IMessagingService, IDisposable
                 _syncSubscribers[messageType] = new List<(string, Action<object>)>();
             }
 
-            // Check for existing subscription by SubscriberInfo
             if (!_syncSubscribers[messageType].Any(s => s.SubscriberInfo == subscriberInfo))
             {
                 _syncSubscribers[messageType].Add((subscriberInfo, wrappedHandler));
@@ -142,7 +135,6 @@ public class MessagingService : IMessagingService, IDisposable
                 _asyncSubscribers[messageType] = new List<(string, Func<object, Task>)>();
             }
 
-            // Check for existing subscription by SubscriberInfo
             if (!_asyncSubscribers[messageType].Any(s => s.SubscriberInfo == subscriberInfo))
             {
                 _asyncSubscribers[messageType].Add((subscriberInfo, wrappedHandler));
@@ -214,197 +206,23 @@ public class MessagingService : IMessagingService, IDisposable
         }
     }
 
-    private async Task ExecuteAsyncCallback(
-        Func<object, Task> handler,
-        object message,
-        string subscriberInfo,
-        Type messageType,
-        CancellationToken token,
-        TaskCompletionSource<bool> tcs)
-    {
-        Debug.WriteLine(
-            $"ExecuteAsyncHandler Callback - Thread ID: {Thread.CurrentThread.ManagedThreadId}");
-        if (token.IsCancellationRequested)
-        {
-            tcs.TrySetCanceled();
-            return;
-        }
-
-        try
-        {
-            await handler(message);
-            tcs.TrySetResult(true);
-        }
-        catch (Exception ex)
-        {
-            OnHandlerException(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
-            tcs.TrySetResult(false);
-        }
-    }
-
-    private async Task ExecuteAsyncHandler(
-        Func<object, Task> handler,
-        object message,
-        string subscriberInfo,
-        Type messageType)
-    {
-        using var cts = new CancellationTokenSource(_handlerTimeout);
-        var tcs = new TaskCompletionSource<bool>();
-        var token = cts.Token; // Capture the token before disposal
-
-        try
-        {
-            if (_synchronizationContext != null)
-            {
-                _synchronizationContext.Post(
-                    _ => ExecuteAsyncCallback(
-                        handler,
-                        message,
-                        subscriberInfo,
-                        messageType,
-                        token,
-                        tcs),
-                    null);
-            }
-            else
-            {
-                // Blazor WASM
-                await ExecuteAsyncCallback(
-                    handler,
-                    message,
-                    subscriberInfo,
-                    messageType,
-                    token,
-                    tcs);
-            }
-
-            using (cts.Token.Register(
-                       () =>
-                           {
-                               if (!tcs.Task.IsCompleted)
-                               {
-                                   OnHandlerException(
-                                       new HandlerExceptionEventArgs(
-                                           subscriberInfo,
-                                           new TimeoutException(
-                                               $"Async handler timed out after {_handlerTimeout.TotalMilliseconds}ms"),
-                                           messageType));
-                                   tcs.TrySetResult(false);
-                               }
-                           }))
-            {
-                await tcs.Task;
-            }
-        }
-        catch (Exception ex)
-        {
-            OnHandlerException(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
-        }
-    }
-
-    private void ExecuteSyncCallback(
-        Action<object> handler,
-        object message,
-        string subscriberInfo,
-        Type messageType,
-        CancellationToken token,
-        TaskCompletionSource<bool> tcs)
-    {
-        Debug.WriteLine(
-            $"ExecuteSyncHandler Callback - Thread ID: {Thread.CurrentThread.ManagedThreadId}");
-        if (token.IsCancellationRequested)
-        {
-            tcs.TrySetCanceled();
-            return;
-        }
-
-        try
-        {
-            handler(message);
-            tcs.TrySetResult(true);
-        }
-        catch (Exception ex)
-        {
-            OnHandlerException(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
-            tcs.TrySetResult(false);
-        }
-    }
-
-    private async Task ExecuteSyncHandler(
-        Action<object> handler,
-        object message,
-        string subscriberInfo,
-        Type messageType)
-    {
-        using var cts = new CancellationTokenSource(_handlerTimeout);
-        var tcs = new TaskCompletionSource<bool>();
-        var token = cts.Token; // Capture the token before disposal
-
-        try
-        {
-            if (_synchronizationContext != null)
-            {
-                _synchronizationContext.Post(
-                    _ => ExecuteSyncCallback(
-                        handler,
-                        message,
-                        subscriberInfo,
-                        messageType,
-                        token,
-                        tcs),
-                    null);
-            }
-            else
-            {
-                ExecuteSyncCallback(
-                    handler,
-                    message,
-                    subscriberInfo,
-                    messageType,
-                    token,
-                    tcs); // Blazor WASM
-            }
-
-            using (cts.Token.Register(
-                       () =>
-                           {
-                               if (!tcs.Task.IsCompleted)
-                               {
-                                   OnHandlerException(
-                                       new HandlerExceptionEventArgs(
-                                           subscriberInfo,
-                                           new TimeoutException(
-                                               $"Sync handler timed out after {_handlerTimeout.TotalMilliseconds}ms"),
-                                           messageType));
-                                   tcs.TrySetResult(false);
-                               }
-                           }))
-            {
-                await tcs.Task;
-            }
-        }
-        catch (Exception ex)
-        {
-            OnHandlerException(new HandlerExceptionEventArgs(subscriberInfo, ex, messageType));
-        }
-    }
-
     private string GetSubscriberInfo()
     {
         var stackFrame = new StackFrame(
             2,
-            false); // Skip 2 frames: this method and Subscribe/Unsubscribe
+            false);
         var method = stackFrame.GetMethod();
         string className = method?.DeclaringType?.Name ?? "UnknownClass";
         string methodName = method?.Name ?? "UnknownMethod";
         return $"{className}.{methodName}";
     }
 
+    // Extracted interface for handler tasks
     private class HandlerTaskInfo
     {
-        public string SubscriberId { get; set; }
+        public string SubscriberId { get; set; } = string.Empty;
 
-        public Task Task { get; set; }
+        public Task Task { get; set; } = Task.CompletedTask;
     }
 
     private async Task ProcessMessages()
@@ -419,12 +237,12 @@ public class MessagingService : IMessagingService, IDisposable
                 if (_syncSubscribers.TryGetValue(msgType, out var syncSubscribers))
                 {
                     var syncList = syncSubscribers.ToList();
-                    foreach (var (subscriberId, handler) in syncList) // SubscriberId is now string
+                    foreach (var (subscriberId, handler) in syncList)
                     {
                         taskInfos.Add(
                             new HandlerTaskInfo
                                 {
-                                    Task = ExecuteSyncHandler(
+                                    Task = _handlerExecutor.ExecuteSyncHandler(
                                         handler,
                                         message,
                                         subscriberId,
@@ -437,12 +255,12 @@ public class MessagingService : IMessagingService, IDisposable
                 if (_asyncSubscribers.TryGetValue(msgType, out var asyncSubscribers))
                 {
                     var asyncList = asyncSubscribers.ToList();
-                    foreach (var (subscriberId, handler) in asyncList) // SubscriberId is now string
+                    foreach (var (subscriberId, handler) in asyncList)
                     {
                         taskInfos.Add(
                             new HandlerTaskInfo
                                 {
-                                    Task = ExecuteAsyncHandler(
+                                    Task = _handlerExecutor.ExecuteAsyncHandler(
                                         handler,
                                         message,
                                         subscriberId,
@@ -481,7 +299,8 @@ public class MessagingService : IMessagingService, IDisposable
         var tasks = taskInfos.Select(t => t.Task).ToArray();
 
         // it is fallback only for main timeout handler, so give main timeouts time for execution
-        var timeoutTask = Task.Delay(timeout + TimeSpan.FromSeconds(1));
+        TimeSpan newTimeout = timeout + AdditionalTimeoutDuration;
+        var timeoutTask = Task.Delay(newTimeout);
         var completedTask = await Task.WhenAny(Task.WhenAll(tasks), timeoutTask);
 
         if (completedTask == timeoutTask)
@@ -492,14 +311,14 @@ public class MessagingService : IMessagingService, IDisposable
             {
                 OnHandlerException(
                     new HandlerExceptionEventArgs(
-                        taskInfo.SubscriberId, // SubscriberId is now string
+                        taskInfo.SubscriberId,
                         new TimeoutException(
-                            $"Async handler timed out after {timeout.TotalMilliseconds}ms"),
+                            $"Async handler timed out after {newTimeout.TotalMilliseconds}ms"),
                         messageType));
             }
 
             throw new TimeoutException(
-                $"Async handler timed out after {timeout.TotalMilliseconds}ms");
+                $"Async handler timed out after {newTimeout.TotalMilliseconds}ms");
         }
 
         await Task.WhenAll(tasks); // Ensure exceptions are propagated.

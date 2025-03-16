@@ -68,12 +68,14 @@ public class MessagingServiceTests : IDisposable
         await _messagingService.Publish("test message");
 
         // Wait a moment to allow the handler to trigger the timeout
-        await Task.Delay(_handlerTimeout + TimeSpan.FromMilliseconds(1500)); 
-        
+        await Task.Delay(_handlerTimeout + TimeSpan.FromMilliseconds(1500));
+
+        var globalTimeout = _handlerTimeout + MessagingService.AdditionalTimeoutDuration;
+
         // Assert
         receivedException.Should().NotBeNull("a timeout exception should have been raised");
         receivedException.Should().BeOfType<TimeoutException>();
-        receivedException!.Message.Should().Contain($"Async handler timed out after {_handlerTimeout.TotalMilliseconds}ms");
+        receivedException!.Message.Should().Contain($"Async handler timed out after {globalTimeout.TotalMilliseconds}ms");
     }
 
     [Fact]
