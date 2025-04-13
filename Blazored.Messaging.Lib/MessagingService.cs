@@ -91,13 +91,13 @@ public class MessagingService : IMessagingService, IDisposable
         {
             return Task.WhenAny(tcs.Task, Task.Delay(_handlerTimeout)).ContinueWith(
                 t =>
+                {
+                    if (!tcs.Task.IsCompleted)
                     {
-                        if (!tcs.Task.IsCompleted)
-                        {
-                            throw new TimeoutException(
-                                $"Publishing {typeof(TMessage).Name} timed out after {_handlerTimeout.TotalMilliseconds}ms.");
-                        }
-                    });
+                        throw new TimeoutException(
+                            $"Publishing {typeof(TMessage).Name} timed out after {_handlerTimeout.TotalMilliseconds}ms.");
+                    }
+                });
         }
 
         return tcs.Task;
@@ -107,7 +107,7 @@ public class MessagingService : IMessagingService, IDisposable
         where TMessage : class
     {
         var messageType = typeof(TMessage);
-        string subscriberInfo = GetMethodInfo(handler.Method);
+        string subscriberInfo = GetMethodInfo(handler);
         Action<object> wrappedHandler = msg => handler((TMessage)msg);
 
         lock (_syncSubscribers)
@@ -135,7 +135,7 @@ public class MessagingService : IMessagingService, IDisposable
         where TMessage : class
     {
         var messageType = typeof(TMessage);
-        string subscriberInfo = GetMethodInfo(handler.Method);
+        string subscriberInfo = GetMethodInfo(handler);
         Func<object, Task> wrappedHandler = msg => handler((TMessage)msg);
 
         lock (_asyncSubscribers)
@@ -163,7 +163,7 @@ public class MessagingService : IMessagingService, IDisposable
         where TMessage : class
     {
         var messageType = typeof(TMessage);
-        string subscriberInfo = GetMethodInfo(handler.Method);
+        string subscriberInfo = GetMethodInfo(handler);
 
         lock (_syncSubscribers)
         {
@@ -178,7 +178,7 @@ public class MessagingService : IMessagingService, IDisposable
         where TMessage : class
     {
         var messageType = typeof(TMessage);
-        string subscriberInfo = GetMethodInfo(handler.Method);
+        string subscriberInfo = GetMethodInfo(handler);
 
         lock (_asyncSubscribers)
         {
@@ -195,14 +195,14 @@ public class MessagingService : IMessagingService, IDisposable
         {
             _synchronizationContext.Post(
                 state =>
+                {
+                    _exceptionHandlerManager.Invoke(this, e);
+                    if (!_exceptionHandlerManager.HasSubscribers)
                     {
-                        _exceptionHandlerManager.Invoke(this, e);
-                        if (!_exceptionHandlerManager.HasSubscribers)
-                        {
-                            Console.WriteLine(
-                                $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
-                        }
-                    },
+                        Console.WriteLine(
+                            $"Handler exception for {e.MessageType.Name}: {e.Exception.Message}");
+                    }
+                },
                 null);
         }
         else
@@ -216,19 +216,34 @@ public class MessagingService : IMessagingService, IDisposable
         }
     }
 
-    private static string GetMethodInfo(MethodInfo handlerMethod)
+    //private static string GetMethodInfo(MethodInfo handlerMethod)
+    //{
+    //    return $"{handlerMethod.DeclaringType?.Name}::{handlerMethod.Name}";
+    //}
+
+    private static string GetMethodInfo(Delegate handler)
     {
-        return $"{handlerMethod.DeclaringType?.Name}::{handlerMethod.Name}";
+        // Get method information
+        var method = handler.Method;
+        string className = method.DeclaringType?.Name ?? "UnknownClass";
+        string methodName = method.Name;
+
+        // Get instance information (if applicable)
+        string instanceInfo = handler.Target != null
+          ? $"InstanceID:{handler.Target.GetHashCode()}"
+          : "StaticMethod";
+
+        return $"{className}::{methodName} [{instanceInfo}]";
     }
 
-    private string GetSubscriberInfo()
-    {
-        var stackFrame = new StackFrame(2, false);
-        var method = stackFrame.GetMethod();
-        string className = method?.DeclaringType?.Name ?? "UnknownClass";
-        string methodName = method?.Name ?? "UnknownMethod";
-        return $"{className}.{methodName}";
-    }
+    //private string GetSubscriberInfo()
+    //  {
+    //      var stackFrame = new StackFrame(2, false);
+    //      var method = stackFrame.GetMethod();
+    //      string className = method?.DeclaringType?.Name ?? "UnknownClass";
+    //      string methodName = method?.Name ?? "UnknownMethod";
+    //      return $"{className}.{methodName}";
+    //  }
 
     private class HandlerTaskInfo
     {

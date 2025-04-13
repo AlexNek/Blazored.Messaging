@@ -200,8 +200,9 @@ Licensed under the **Apache License 2.0** - see [LICENSE](LICENSE) for details.
 
 ## Version History
 - **v1.0.0**: Initial release.
-- **v1.1.0**: Added prevention of duplicate subscriptions and long running task timiout.
+- **v1.1.0**: Added prevention of duplicate subscriptions and long running task timeout.
 - **v1.2.0**: Missed file - SubscriberException.
 - **v1.2.1**: Downgrade to .NET 8.0.
-- **v1.3.0**: improvements for breakpoint debugging on subscription handler
-- **V1.3.1**: Rename back HandlerExceptionEventArgs
+- **v1.3.0**: Improvements for breakpoint debugging on subscription handler.
+- **v1.3.1**: Rename back HandlerExceptionEventArgs.
+- **v1.4.0**: Updated subscription mechanism to include instance ID, allowing the same class to be used in different places without conflicts.

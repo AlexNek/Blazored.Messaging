@@ -3,7 +3,7 @@
 @using Blazor.Messaging.Demo.Messages
 @implements IDisposable
 
-<h3>Notification Component with exception</h3>
+<h3>Notification Component with exception @Id</h3>
 
 <p>@_notification</p>
 
@@ -14,6 +14,8 @@
     [Inject]
     public IHttpContextAccessor HttpContextAccessor { get; set; }
 
+    [Parameter]
+    public string? Id { get; set; }
     /// <summary>
     /// Check for prerendering mode. Version for .NET 8
     /// </summary>
